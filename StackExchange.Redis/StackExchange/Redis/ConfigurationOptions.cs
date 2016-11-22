@@ -210,7 +210,7 @@ namespace StackExchange.Redis
         /// <summary>
         /// The server version to assume
         /// </summary>
-        public Version DefaultVersion { get { return defaultVersion ?? RedisFeatures.v2_0_0; } set { defaultVersion = value; } }
+        public Version DefaultVersion { get { return defaultVersion ?? (IsAzureEndpoint() ? RedisFeatures.v3_0_0 : RedisFeatures.v2_0_0); } set { defaultVersion = value; } }
 
         /// <summary>
         /// The endpoints defined for this configuration
@@ -233,7 +233,7 @@ namespace StackExchange.Redis
         public string Password { get { return password; } set { password = value; } }
 
         /// <summary>
-        /// Indicates whether admin operations should be allowed
+        /// Type of proxy to use (if any); for example Proxy.Twemproxy
         /// </summary>
         public Proxy Proxy { get { return proxy.GetValueOrDefault(); } set { proxy = value; } }
 
@@ -366,9 +366,20 @@ namespace StackExchange.Redis
         }
 
         /// <summary>
-        /// Returns the effective configuration string for this configuration
+        /// Returns the effective configuration string for this configuration, including Redis credentials.
         /// </summary>
         public override string ToString()
+        {
+            // include password to allow generation of configuration strings 
+            // used for connecting multiplexer
+            return ToString(includePassword: true);
+        }
+
+        /// <summary>
+        /// Returns the effective configuration string for this configuration
+        /// with the option to include or exclude the password from the string.
+        /// </summary>
+        public string ToString(bool includePassword)
         {
             var sb = new StringBuilder();
             foreach (var endpoint in endpoints)
@@ -382,7 +393,7 @@ namespace StackExchange.Redis
             Append(sb, OptionKeys.AllowAdmin, allowAdmin);
             Append(sb, OptionKeys.Version, defaultVersion);
             Append(sb, OptionKeys.ConnectTimeout, connectTimeout);
-            Append(sb, OptionKeys.Password, password);
+            Append(sb, OptionKeys.Password, includePassword ? password : "*****");
             Append(sb, OptionKeys.TieBreaker, tieBreaker);
             Append(sb, OptionKeys.WriteBuffer, writeBuffer);
             Append(sb, OptionKeys.Ssl, ssl);
@@ -656,6 +667,7 @@ namespace StackExchange.Redis
                         case ".redis.cache.windows.net":
                         case ".redis.cache.chinacloudapi.cn":
                         case ".redis.cache.usgovcloudapi.net":
+                        case ".redis.cache.cloudapi.de":
                             return true;
                     }
                 }

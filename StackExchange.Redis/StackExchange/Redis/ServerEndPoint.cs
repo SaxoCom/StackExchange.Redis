@@ -25,7 +25,7 @@ namespace StackExchange.Redis
     {
         internal volatile ServerEndPoint Master;
         internal volatile ServerEndPoint[] Slaves = NoSlaves;
-        private static readonly Regex nameSanitizer = new Regex("[^!-~]", InternalRegexCompiledOption.Default);
+        private static readonly Regex nameSanitizer = new Regex("[^!-~]", RegexOptions.Compiled);
         private static readonly ServerEndPoint[] NoSlaves = new ServerEndPoint[0];
         private readonly EndPoint endpoint;
 
@@ -88,6 +88,35 @@ namespace StackExchange.Redis
             {
                 var tmp = interactive;
                 return tmp != null && tmp.IsConnected;
+            }
+        }
+
+        internal Exception LastException
+        {
+            get
+            {
+                var tmp1 = interactive;
+                var tmp2 = subscription;
+
+                //check if subscription endpoint has a better lastexception
+                if (tmp2 != null && tmp2.LastException != null)
+                {
+                    var failureType = tmp2.LastException.Data["Redis-FailureType"];
+                    if (failureType != null && !failureType.ToString().Equals(ConnectionFailureType.UnableToConnect.ToString()))
+                    {
+                        return tmp2.LastException;
+                    }
+                }
+                return tmp1?.LastException;
+            }
+        }
+
+        internal PhysicalBridge.State ConnectionState
+        {
+            get
+            {
+                var tmp = interactive;
+                return tmp.ConnectionState;
             }
         }
 
@@ -524,7 +553,7 @@ namespace StackExchange.Redis
             if (bridge == null) bridge = GetBridge(message.Command);
             if (!bridge.TryEnqueue(message, isSlave))
             {
-                ConnectionMultiplexer.ThrowFailed(tcs, ExceptionFactory.NoConnectionAvailable(multiplexer.IncludeDetailInExceptions, message.Command, message, this));
+                ConnectionMultiplexer.ThrowFailed(tcs, ExceptionFactory.NoConnectionAvailable(multiplexer.IncludeDetailInExceptions, message.Command, message, this, multiplexer.GetServerSnapshot()));
             }
             return tcs.Task;
         }

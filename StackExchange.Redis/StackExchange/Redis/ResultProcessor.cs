@@ -141,6 +141,7 @@ namespace StackExchange.Redis
                 var server = bridge.ServerEndPoint;
                 bool log = !message.IsInternalCall;
                 bool isMoved = result.AssertStarts(MOVED);
+                string err = string.Empty;
                 if (isMoved || result.AssertStarts(ASK))
                 {
                     message.SetResponseReceived();
@@ -161,11 +162,19 @@ namespace StackExchange.Redis
                                 connection.Multiplexer.Trace(message.Command + " re-issued to " + endpoint, isMoved ? "MOVED" : "ASK");
                                 return false;
                             }
+                            else
+                            {
+                                err = string.Format("Endpoint {0} serving hashslot {1} is not reachable at this point of time. Please check connectTimeout value. If it is low, try increasing it to give the ConnectionMultiplexer a chance to recover from the network disconnect.", endpoint, hashSlot);
+                            }
                         }
                     }
                 }
 
-                string err = result.GetString();
+                if (string.IsNullOrWhiteSpace(err))
+                {
+                    err = result.GetString();
+                }
+                
                 if (log)
                 {
                     bridge.Multiplexer.OnErrorMessage(server.EndPoint, err);
@@ -347,7 +356,7 @@ namespace StackExchange.Redis
 
         internal sealed class ScriptLoadProcessor : ResultProcessor<byte[]>
         {
-            static readonly Regex sha1 = new Regex("^[0-9a-f]{40}$", InternalRegexCompiledOption.Default | RegexOptions.IgnoreCase);
+            static readonly Regex sha1 = new Regex("^[0-9a-f]{40}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
             internal static bool IsSHA1(string script)
             {
@@ -1165,7 +1174,7 @@ namespace StackExchange.Redis
                 {
                     if (result.IsEqual(authFail) || result.IsEqual(authRequired))
                     {
-                        connection.RecordConnectionFailed(ConnectionFailureType.AuthenticationFailure);
+                        connection.RecordConnectionFailed(ConnectionFailureType.AuthenticationFailure, new Exception(result.ToString() + " Verify if the Redis password provided is correct."));
                     }
                     else if (result.AssertStarts(loading))
                     {
@@ -1236,6 +1245,11 @@ namespace StackExchange.Redis
                             SetResult(message, null);
                             return true;
                         }
+                        break;
+                    case ResultType.SimpleString:
+                        //We don't want to blow up if the master is not found
+                        if (result.IsNull)
+                            return true;
                         break;
                 }
                 return false;

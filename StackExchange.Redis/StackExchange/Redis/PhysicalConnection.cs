@@ -32,6 +32,10 @@ namespace StackExchange.Redis
         {
             return result =>
             {   // can't capture AsyncState on SocketRead, so we'll do it once per physical instead
+                if (result.IsFaulted)
+                {
+                    GC.KeepAlive(result.Exception);
+                }
                 try
                 {
                     physical.Multiplexer.Trace("Completed asynchronously: processing in callback", physical.physicalName);
@@ -690,7 +694,7 @@ namespace StackExchange.Redis
                     Multiplexer.Trace("Beginning async read...", physicalName);
 #if CORE_CLR
                     var result = netStream.ReadAsync(ioBuffer, ioBufferBytes, space);
-                    switch(result.Status)
+                    switch (result.Status)
                     {
                         case TaskStatus.RanToCompletion:
                         case TaskStatus.Faulted:
@@ -779,11 +783,15 @@ namespace StackExchange.Redis
                         );
                     try
                     {
+#if CORE_CLR
+                        ssl.AuthenticateAsClientAsync(host).GetAwaiter().GetResult();
+#else
                         ssl.AuthenticateAsClient(host);
+#endif
                     }
-                    catch (AuthenticationException)
+                    catch (AuthenticationException authexception)
                     {
-                        RecordConnectionFailed(ConnectionFailureType.AuthenticationFailure);
+                        RecordConnectionFailed(ConnectionFailureType.AuthenticationFailure, authexception);
                         Multiplexer.Trace("Encryption failure");
                         return SocketMode.Abort;
                     }
@@ -794,11 +802,7 @@ namespace StackExchange.Redis
 
                 int bufferSize = config.WriteBuffer;
                 this.netStream = stream;
-#if CORE_CLR
-                this.outStream = bufferSize <= 0 ? stream : new BufferedOutputStream(stream, bufferSize);
-#else
                 this.outStream = bufferSize <= 0 ? stream : new BufferedStream(stream, bufferSize);
-#endif
                 Multiplexer.LogLocked(log, "Connected {0}", Bridge);
 
                 Bridge.OnConnected(this, log);
