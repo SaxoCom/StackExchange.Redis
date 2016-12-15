@@ -17,6 +17,7 @@ namespace Saxo.RedisCache
                 configurationOptions.AbortOnConnectFail = false;
                 configurationOptions.KeepAlive = 180;
                 configurationOptions.Ssl = false;
+                configurationOptions.AllowAdmin = true;
                 return configurationOptions;
             }
         }
@@ -72,6 +73,17 @@ namespace Saxo.RedisCache
             {
                 var server = ConnectionMultiplexer.GetServer(endpoint);
                 server.FlushAllDatabases();
+            }
+        }
+
+        public void ClearByTag(string tag)
+        {
+            var endpoints = ConnectionMultiplexer.GetEndPoints(true);
+            foreach (var endpoint in endpoints)
+            {
+                var server = ConnectionMultiplexer.GetServer(endpoint);
+                var keys = server.Keys(pattern: "{" + string.Format("{0}", tag) + "}*").ToArray();
+                KeyDelete(keys);
             }
         }
 

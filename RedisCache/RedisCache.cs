@@ -136,6 +136,12 @@ namespace Saxo.RedisCache
             _cache.KeyDelete(keysForLookup);
         }
 
+        public void ClearByTag(string tag)
+        {
+            _cache.ClearByTag(tag);
+        }
+
+
         public void Dispose()
         {
             Dispose(true);
