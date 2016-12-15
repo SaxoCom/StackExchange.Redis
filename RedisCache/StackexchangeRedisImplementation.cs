@@ -5,7 +5,7 @@ using StackExchange.Redis;
 
 namespace Saxo.RedisCache
 {
-    public class StackexchangeRedisImplementation : IRedisImplementation, IDisposable
+    internal class StackexchangeRedisImplementation : IRedisImplementation, IDisposable
     {
         private readonly IRedisCacheSettings _settings;
 
